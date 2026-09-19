@@ -1,0 +1,6 @@
+{
+  "name": "Festival Task Manager Telegram Web App",
+  "description": "Telegram Web App и бот на FastAPI, aiogram, PostgreSQL и Supabase Storage для управления задачами на фестивале.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

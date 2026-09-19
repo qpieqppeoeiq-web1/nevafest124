@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Фестиваль: Задачи</title>
+  <!-- Telegram Web App SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <!-- Supabase JS Client via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Контейнер приложения -->
+  <div id="app" class="app-container">
+
+    <!-- Верхняя панель (Header) -->
+    <header class="app-header">
+      <div class="header-left">
+        <span class="festival-badge">FESTIVAL 2026</span>
+        <h1 id="headerTitle" class="header-title">Фестивальные задачи</h1>
+      </div>
+      <div class="header-right">
+        <span id="roleIndicator" class="role-badge" style="display: none;"></span>
+        <button id="switchRoleBtn" class="btn-icon" title="Сменить роль" style="display: none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- 1. ЭКРАН ВЫБОРА РОЛИ -->
+    <section id="roleSelectScreen" class="screen active">
+      <div class="role-select-box">
+        <div class="role-welcome">
+          <div class="festival-icon-glow">🎪</div>
+          <h2>Выберите вашу роль</h2>
+          <p class="subtitle">Для доступа к задачам координации фестиваля</p>
+        </div>
+
+        <div class="role-cards-grid">
+          <button id="selectVolunteerBtn" class="role-choice-card">
+            <div class="role-icon">🤝</div>
+            <div class="role-text">
+              <h3>Волонтёр</h3>
+              <p>Просмотр назначенных задач, сметы статусов и чат с админами</p>
+            </div>
+            <div class="role-arrow">→</div>
+          </button>
+
+          <button id="selectOrganizerBtn" class="role-choice-card">
+            <div class="role-icon">⚡</div>
+            <div class="role-text">
+              <h3>Организатор</h3>
+              <p>Управление задачами, тегами, прогрессом и архивом (по паролю)</p>
+            </div>
+            <div class="role-arrow">→</div>
+          </button>
+        </div>
+
+        <div id="tgUserInfoBox" class="tg-user-pill">
+          <span class="pulse-dot"></span>
+          <span id="tgUserLabel">Вход через Telegram...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. МОДАЛЬНОЕ ОКНО ВВОДА ПАРОЛЯ ДЛЯ ОРГАНИЗАТОРА/АДМИНА -->
+    <div id="passwordModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Вход для организаторов</h3>
+          <button id="closePasswordModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-hint">Введите код доступа для роли Организатора (1965) или Главного администратора (19907):</p>
+          <div class="pin-input-wrap">
+            <input type="password" id="passwordInput" placeholder="Код доступа" maxlength="10" inputmode="numeric" autofocus>
+          </div>
+          <p id="passwordError" class="error-msg hidden">Неверный код доступа</p>
+        </div>
+        <div class="modal-footer">
+          <button id="cancelPasswordBtn" class="btn-secondary">Отмена</button>
+          <button id="submitPasswordBtn" class="btn-primary">Войти</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. ГЛАВНАЯ ПАНЕЛЬ ЗАДАЧ (ДЛЯ ВОЛОНТЕРА / ОРГАНИЗАТОРА / АДМИНА) -->
+    <section id="mainScreen" class="screen hidden">
+
+      <!-- Секция прогресс-баров фестиваля -->
+      <section class="progress-section">
+        <div class="section-header">
+          <span class="section-title">📊 Прогресс фестиваля</span>
+          <button id="addProgressBarBtn" class="btn-link-action hidden">+ Создать прогресс-бар</button>
+        </div>
+        <div id="progressBarsContainer" class="progress-list">
+          <div class="progress-loader">Загрузка этапов фестиваля...</div>
+        </div>
+      </section>
+
+      <!-- Панель управления администратора (кнопки создания и архива) -->
+      <div id="adminActionToolbar" class="admin-toolbar hidden">
+        <button id="openCreateTaskModalBtn" class="btn-admin-primary">
+          <span>+</span> Новое задание
+        </button>
+        <button id="openTagManagerBtn" class="btn-admin-secondary">
+          🏷️ Теги волонтёров
+        </button>
+        <button id="openArchiveBtn" class="btn-admin-secondary">
+          🗄️ Архив
+        </button>
+      </div>
+
+      <!-- Фильтры / вкладки -->
+      <div class="tasks-filter-bar">
+        <div class="filter-pills">
+          <button class="filter-pill active" data-filter="all">Все задачи</button>
+          <button class="filter-pill" data-filter="urgent">🔴 Срочные</button>
+          <button class="filter-pill" data-filter="in_progress">В работе</button>
+        </div>
+        <span id="tasksCountBadge" class="count-tag">0 задач</span>
+      </div>
+
+      <!-- Список карточек заданий -->
+      <div id="tasksList" class="tasks-grid">
+        <div class="tasks-loading">Загрузка актуальных заданий...</div>
+      </div>
+    </section>
+
+    <!-- 4. ЭКРАН / МОДАЛЬНОЕ ОКНО АРХИВА ЗАВЕРШЕННЫХ ЗАДАЧ -->
+    <div id="archiveModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3>🗄️ Архив выполненных заданий</h3>
+          <button id="closeArchiveModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body scrollable">
+          <div id="archiveTasksList" class="archive-grid">
+            <div class="empty-state">Загрузка архива...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ЗАДАНИЯ (ТОЛЬКО ДЛЯ АДМИНА) -->
+    <div id="createTaskModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3>Новое фестивальное задание</h3>
+          <button id="closeCreateTaskModalBtn" class="close-btn">&times;</button>
+        </div>
+        <form id="createTaskForm" class="modal-body scrollable">
+          <div class="form-group">
+            <label for="taskTitle">Название задания *</label>
+            <input type="text" id="taskTitle" required placeholder="Например: Проверить коммутацию звука на Главной сцене">
+          </div>
+
+          <div class="form-group">
+            <label>Срочность (цвет маркера) *</label>
+            <div class="urgency-selector">
+              <label class="urgency-option red">
+                <input type="radio" name="urgency" value="red" required>
+                <span class="color-dot red"></span>
+                <span>Срочно (Красный)</span>
+              </label>
+              <label class="urgency-option yellow">
+                <input type="radio" name="urgency" value="yellow">
+                <span class="color-dot yellow"></span>
+                <span>Внимание (Жёлтый)</span>
+              </label>
+              <label class="urgency-option green" checked>
+                <input type="radio" name="urgency" value="green" checked>
+                <span class="color-dot green"></span>
+                <span>Стандарт (Зелёный)</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="taskDescription">Описание задания</label>
+            <textarea id="taskDescription" rows="3" placeholder="Подробные указания, тайминг, ответственные контакты..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="taskLinks">Полезные ссылки (через запятую или пробел)</label>
+            <input type="text" id="taskLinks" placeholder="https://cloud.com/shema, https://maps.app...">
+          </div>
+
+          <!-- Загрузка изображения в Supabase Storage -->
+          <div class="form-group">
+            <label>Прикрепить фото (загрузка в Supabase Storage)</label>
+            <div class="file-upload-dropzone" id="dropzone">
+              <input type="file" id="imageInput" accept="image/*" class="file-hidden-input">
+              <div class="upload-placeholder" id="uploadPlaceholder">
+                <span class="upload-icon">📷</span>
+                <p>Нажмите или перетащите фото сюда</p>
+                <small>Загружается напрямую в бакет Supabase Storage</small>
+              </div>
+              <div class="upload-preview hidden" id="uploadPreviewBox">
+                <img id="imagePreview" src="" alt="Превью">
+                <button type="button" id="removeImageBtn" class="btn-remove-photo">&times;</button>
+              </div>
+            </div>
+            <div id="uploadStatusText" class="upload-status hidden"></div>
+          </div>
+
+          <!-- Назначение пользователям -->
+          <div class="form-group">
+            <label for="taskAssignUsers">Назначить конкретным волонтёрам</label>
+            <select id="taskAssignUsers" multiple class="multi-select">
+              <!-- Заполняется динамически из базы -->
+            </select>
+            <small class="helper-text">Удерживайте Ctrl / Cmd для выбора нескольких</small>
+          </div>
+
+          <!-- Назначение по тегам -->
+          <div class="form-group">
+            <label for="taskTagsInput">Теги задания (например: звук, одежда, журнал, сцена)</label>
+            <input type="text" id="taskTagsInput" placeholder="звук, сцена">
+            <small class="helper-text">Задание автоматически увидят волонтёры с такими же тегами</small>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="cancelCreateTaskBtn" class="btn-secondary">Отмена</button>
+            <button type="submit" id="submitCreateTaskBtn" class="btn-primary">
+              <span id="createBtnSpinner" class="spinner hidden"></span>
+              Создать и уведомить бота
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 6. МОДАЛЬНОЕ ОКНО УПРАВЛЕНИЯ ТЕГАМИ ПОЛЬЗОВАТЕЛЕЙ -->
+    <div id="tagManagerModal" class="modal-overlay hidden">
+      <div class="modal-sheet">
+        <div class="modal-header">
+          <h3>🏷️ Управление тегами волонтёров</h3>
+          <button id="closeTagManagerModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body scrollable">
+          <p class="modal-hint">Назначайте теги волонтёрам (например: «звук», «одежда», «журнал»), чтобы группировать задания:</p>
+          <div id="usersTagList" class="users-tag-list">
+            <!-- Заполняется динамически -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ПРОГРЕСС-БАРА -->
+    <div id="createProgressBarModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Создать прогресс-бар</h3>
+          <button id="closeProgressBarModalBtn" class="close-btn">&times;</button>
+        </div>
+        <form id="createProgressBarForm" class="modal-body">
+          <div class="form-group">
+            <label for="pbTitle">Название цели фестиваля *</label>
+            <input type="text" id="pbTitle" required placeholder="Например: Монтаж Главной сцены">
+          </div>
+          <div class="form-group">
+            <label for="pbTags">Связанные теги (через запятую) *</label>
+            <input type="text" id="pbTags" required placeholder="звук, сцена">
+            <small class="helper-text">Прогресс-бар считается по выполненным задачам с этими тегами</small>
+          </div>
+          <div class="form-group">
+            <label for="pbTarget">Целевое количество заданий *</label>
+            <input type="number" id="pbTarget" min="1" value="5" required>
+          </div>
+          <div class="form-actions">
+            <button type="button" id="cancelProgressBarBtn" class="btn-secondary">Отмена</button>
+            <button type="submit" class="btn-primary">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 8. МОДАЛЬНОЕ ОКНО ОБСУЖДЕНИЯ ЗАДАНИЯ (ЧАТ С АДМИНИСТРАЦИЕЙ) -->
+    <div id="discussionModal" class="modal-overlay hidden">
+      <div class="modal-sheet chat-sheet">
+        <div class="modal-header chat-header">
+          <div>
+            <span class="chat-subtitle">Обсуждение задания</span>
+            <h3 id="discussionTaskTitle">Название задачи</h3>
+          </div>
+          <button id="closeDiscussionModalBtn" class="close-btn">&times;</button>
+        </div>
+        <div class="chat-messages-container" id="discussionMessages">
+          <div class="chat-loading">Загрузка сообщений...</div>
+        </div>
+        <form id="discussionSendForm" class="chat-input-bar">
+          <input type="text" id="discussionInput" placeholder="Написать сообщение координаторам..." autocomplete="off" required>
+          <button type="submit" class="btn-send-chat">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
